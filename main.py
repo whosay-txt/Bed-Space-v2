@@ -15,7 +15,7 @@ from datetime import datetime
 from kivy.uix.image import Image
 from kivy.uix.floatlayout import FloatLayout
 from kivy.graphics import Rectangle
-
+from kivy.uix.video import video
 from kivy.graphics import Color
 from kivy.graphics import Line
 from functools import partial
@@ -44,9 +44,11 @@ class MenuScreen(Screen):
 
         layout = FloatLayout()
 
-        # Add background image
-        background = Image(
-            source='room_layout.png',
+        # Add background video
+        background = video(
+            source='Mainmenu.mp4',
+            state='play',
+            options={'eos':'loop'},
             allow_stretch=True,
             keep_ratio=False,
             size_hint=(1, 1),
@@ -676,3 +678,4 @@ class BedSpaceApp(App):
         return sm
 
 BedSpaceApp().run()
+
