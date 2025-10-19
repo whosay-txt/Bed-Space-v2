@@ -1,7 +1,3 @@
-from kivy.config import Config
-Config.set('graphics', 'width', '360')
-Config.set('graphics', 'height', '640')
-
 from kivy.app import App
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.uix.boxlayout import BoxLayout
@@ -15,7 +11,7 @@ from datetime import datetime
 from kivy.uix.image import Image
 from kivy.uix.floatlayout import FloatLayout
 from kivy.graphics import Rectangle
-from kivy.uix.video import video
+from kivy.uix.video import Video
 from kivy.graphics import Color
 from kivy.graphics import Line
 from functools import partial
@@ -36,7 +32,6 @@ CREATE TABLE IF NOT EXISTS tenants (
     leave_date TEXT DEFAULT ''
 )
 """)
-
 # 🏠 Menu Screen
 class MenuScreen(Screen):
     def __init__(self, **kwargs):
@@ -44,11 +39,12 @@ class MenuScreen(Screen):
 
         layout = FloatLayout()
 
-        # Add background video
-        background = video(
+        # Add background image
+        background = Video(
             source='Mainmenu.mp4',
             state='play',
-            options={'eos':'loop'},
+            options={'eos': 'loop'},
+            volume=0,
             allow_stretch=True,
             keep_ratio=False,
             size_hint=(1, 1),
@@ -66,7 +62,7 @@ class MenuScreen(Screen):
             pos_hint={'center_x': 0.5, 'center_y': 0.5}
         )
 
-        for label, target in [("Room A", "room_a"), ("Room B", "room_b"), ("Tenant Info", "tenant_info")]:
+        for label, target in [("Unit 07","unit_a_room_a"),("U8 Room A", "room_a"), ("U8 Room B", "room_b"), ("Tenant Info", "tenant_info")]:
             nav_button = Button(
                 text=label,
                 size_hint_y=None,
@@ -99,8 +95,6 @@ class MenuScreen(Screen):
         def switch(instance):
             self.manager.current = target_screen
         return switch
-
-
 # 🛏️ Room A screen
 class RoomAScreen(Screen):
     def __init__(self, **kwargs):
@@ -120,12 +114,12 @@ class RoomAScreen(Screen):
         from functools import partial
 
         for bed_name, x, y in [
-            ('Up1', 0.05, 0.75), ('Low1', 0.05, 0.65), 
-            ('Up2', 0.27, 0.75), ('Low2', 0.27, 0.65), 
-            ('Up3', 0.56, 0.75), ('Low3', 0.56, 0.65),
-            ('Up4', 0.55, 0.50), ('Low4', 0.55, 0.40),
-            ('Up5', 0.12, 0.1), ('Low5', 0.30, 0.1),
-            ('Up6', 0.60, 0.1), ('Low6', 0.79, 0.1)
+            ('8U15', 0.05, 0.75), ('8L16', 0.05, 0.65), 
+            ('8U17', 0.27, 0.75), ('8L18', 0.27, 0.65), 
+            ('8U13', 0.56, 0.75), ('8L14', 0.56, 0.65),
+            ('8U11', 0.55, 0.50), ('8L12', 0.55, 0.40),
+            ('8U19', 0.12, 0.10), ('8L20', 0.30, 0.10),
+            ('8U21', 0.60, 0.10), ('8L22', 0.79, 0.10)
         ]:
             color = self.get_bunk_color(bed_name)
             btn = Button(
@@ -199,7 +193,192 @@ class RoomAScreen(Screen):
 
             def submit_tenant(instance):
                 self.add_tenant(
-                    room='A', bunk=bunk_name,
+                    room='1508', bunk=bunk_name,
+                    name=name_input.text,
+                    number=contact_input.text,
+                    date=date_input.text,
+                    payment=payment_input.text
+                )
+                self.refresh_bunk_color(bunk_name)
+                popup.dismiss()
+
+            add_btn = Button(text="Add Tenant", size_hint_y=None, height=40)
+            add_btn.bind(on_press=submit_tenant)
+            content_layout.add_widget(add_btn)
+
+        else:
+            for t in active_tenants:
+                info = (
+                    f"Room: {t[1]}\n"
+                    f"Bunk: {t[2]}\n"
+                    f"Name: {t[3]}\n"
+                    f"Date: {t[4]}\n"
+                    f"Contact: {t[5]}\n"
+                    f"Payment: ₱{t[6] if t[6] else '0.00'}\n"
+                    f"Leave: {t[7] or 'N/A'}"
+                )
+                label = Label(text=info, halign='left', valign='top', size_hint_y=None, height=160)
+                label.bind(size=lambda instance, value: setattr(instance, 'text_size', (instance.width, None)))
+                content_layout.add_widget(label)
+
+                payment_input = TextInput(hint_text="Enter Payment")
+                update_btn = Button(text="Update", size_hint_x=0.3)
+                update_btn.bind(on_press=lambda x, tid=t[0], inp=payment_input: self.update_payment(tid, inp.text))
+                payment_row = BoxLayout(size_hint_y=None, height=40, spacing=5)
+                payment_row.add_widget(payment_input)
+                payment_row.add_widget(update_btn)
+                content_layout.add_widget(payment_row)
+
+                leave_input = TextInput(hint_text="Leave Date (YYYY-MM-DD)")
+                leave_btn = Button(text="Set Leave", size_hint_x=0.3)
+                leave_btn.bind(on_press=lambda x, tid=t[0], inp=leave_input: self.update_leave_date(tid, inp.text))
+                leave_row = BoxLayout(size_hint_y=None, height=40, spacing=5)
+                leave_row.add_widget(leave_input)
+                leave_row.add_widget(leave_btn)
+                content_layout.add_widget(leave_row)
+
+                delete_btn = Button(text="Delete Tenant", size_hint_y=None, height=40)
+                delete_btn.bind(on_press=lambda x, tid=t[0]: self.delete_tenant(tid))
+                content_layout.add_widget(delete_btn)
+
+        close_btn = Button(text="Close", size_hint_y=None, height=40)
+        close_btn.bind(on_press=lambda x: popup.dismiss())
+        content_layout.add_widget(close_btn)
+
+        scroll.add_widget(content_layout)
+        popup.content = scroll
+        popup.open()
+
+    def add_tenant(self, room, bunk, name, number, date, payment):
+        try:
+            cursor.execute("""
+                INSERT INTO tenants (room, bunk, name, number, date, payment)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (room, bunk, name, number, date, float(payment) if payment else 0.0))
+            conn.commit()
+        except Exception as e:
+            print(f"Error adding tenant: {e}")
+
+    def update_payment(self, tenant_id, amount):
+        try:
+            cursor.execute("UPDATE tenants SET payment = ? WHERE id = ?", (float(amount), tenant_id))
+            conn.commit()
+        except Exception as e:
+            print(f"Error updating payment: {e}")
+
+    def update_leave_date(self, tenant_id, leave_date):
+        try:
+            cursor.execute("UPDATE tenants SET leave_date = ? WHERE id = ?", (leave_date, tenant_id))
+            conn.commit()
+        except Exception as e:
+            print(f"Error updating leave date: {e}")
+
+    def delete_tenant(self, tenant_id):
+        try:
+            cursor.execute("DELETE FROM tenants WHERE id = ?", (tenant_id,))
+            conn.commit()
+        except Exception as e:
+            print(f"Error deleting tenant: {e}")
+class UnitARoomAScreen(Screen):
+    def __init__(self, **kwargs):
+        super(UnitARoomAScreen, self).__init__(**kwargs)
+        layout = FloatLayout()
+        self.bunk_buttons = {}
+        # Background image
+        layout.add_widget(Image(
+            source='UnitA.png',
+            allow_stretch=True,
+            keep_ratio=False,
+            size_hint=(1, 1),
+            pos_hint={'x': 0, 'y': 0}
+        ))
+
+        # Bed buttons
+        from functools import partial
+
+        for bed_name, x, y in [
+            ('7U07', 0.33, 0.70), ('7L08', 0.43, 0.70), 
+            ('7U09', 0.27, 0.63), ('7L10', 0.27, 0.58), 
+            ('7U05', 0.43, 0.63), ('7L06', 0.43, 0.58),
+            ('7U03', 0.55, 0.70), ('7L04', 0.65, 0.70),
+            ('7U01', 0.67, 0.63), ('7L02', 0.67, 0.58),
+            ('7U15', 0.27, 0.35), ('7L16', 0.27, 0.29),
+            ('7U13', 0.37, 0.26), ('7L14', 0.47, 0.26),
+            ('7U13', 0.60, 0.26), ('7L12', 0.70, 0.26),
+        ]:
+            color = self.get_bunk_color(bed_name)
+            btn = Button(
+                text=bed_name,
+                size_hint=(0.10, 0.05),
+                pos_hint={'x': x, 'y': y},
+                background_color=color
+            )
+            btn.bind(on_release=partial(self.show_tenant_popup, bunk_name=bed_name))
+            layout.add_widget(btn)
+            self.bunk_buttons[bed_name] = btn
+
+        back_btn = Button(text="Back", size_hint=(1, None), height=50, pos_hint={'x': 0, 'y': 0})
+        back_btn.bind(on_release=lambda x: setattr(self.manager, 'current', 'menu'))
+        layout.add_widget(back_btn)
+
+        self.add_widget(layout)
+
+    def get_bunk_color(self, bunk_name):
+        today = datetime.today().strftime("%Y-%m-%d")
+        cursor.execute("SELECT leave_date FROM tenants WHERE bunk = ?", (bunk_name,))
+        tenants = cursor.fetchall()
+        for t in tenants:
+            leave = t[0]
+            if not leave or leave.strip() == '' or leave.strip().upper() == 'N/A' or leave > today:
+                return (1, 0, 0, 0.5)  # Red
+        return (0, 1, 0, 0.5)  # Green
+
+    def refresh_bunk_color(self, bunk_name):
+        if bunk_name in self.bunk_buttons:
+            self.bunk_buttons[bunk_name].background_color = self.get_bunk_color(bunk_name)
+
+    def show_tenant_popup(self, instance, bunk_name):
+        today = datetime.today().strftime("%Y-%m-%d")
+        cursor.execute("""
+            SELECT id, room, bunk, name, date, number, payment, leave_date
+            FROM tenants
+            WHERE bunk = ?
+        """, (bunk_name,))
+        all_tenants = cursor.fetchall()
+
+        active_tenants = []
+        for t in all_tenants:
+            leave = t[7]
+            if not leave or leave.strip() == '' or leave.strip().upper() == 'N/A' or leave > today:
+                active_tenants.append(t)
+
+        scroll = ScrollView()
+        content_layout = BoxLayout(orientation='vertical', size_hint_y=None, padding=10, spacing=10)
+        content_layout.bind(minimum_height=content_layout.setter('height'))
+
+        popup = Popup(title=f"Tenant Info - {bunk_name}", size_hint=(0.9, 0.8))
+
+        if not active_tenants:
+            content_layout.add_widget(Label(
+                text=f"No active tenant in bunk {bunk_name}.",
+                size_hint_y=None, height=40
+            ))
+
+            content_layout.add_widget(Label(text="Add New Tenant", size_hint_y=None, height=30))
+
+            name_input = TextInput(hint_text="Full Name", size_hint_y=None, height=40)
+            contact_input = TextInput(hint_text="Contact Number", size_hint_y=None, height=40)
+            date_input = TextInput(hint_text="Start Date (YYYY-MM-DD)", size_hint_y=None, height=40)
+            payment_input = TextInput(hint_text="Initial Payment", size_hint_y=None, height=40)
+
+            content_layout.add_widget(name_input)
+            content_layout.add_widget(contact_input)
+            content_layout.add_widget(date_input)
+            content_layout.add_widget(payment_input)
+
+            def submit_tenant(instance):
+                self.add_tenant(
+                    room='1507', bunk=bunk_name,
                     name=name_input.text,
                     number=contact_input.text,
                     date=date_input.text,
@@ -286,8 +465,7 @@ class RoomAScreen(Screen):
         except Exception as e:
             print(f"Error deleting tenant: {e}")
 
-
-
+# 🛏️ Room B screen
 class RoomBScreen(Screen):
     def __init__(self, **kwargs):
         super(RoomBScreen, self).__init__(**kwargs)
@@ -307,11 +485,11 @@ class RoomBScreen(Screen):
         from functools import partial
 
         for bed_name, x, y in [
-            ('Up1', 0.47, 0.62),('Low1', 0.63, 0.62), 
-            ('Up2', 0.47, 0.47), ('Low2', 0.63, 0.47), 
-            ('Up3', 0.47, 0.34), ('Low3', 0.63, 0.34),
-            ('Up4', 0.12, 0.46), ('Low4', 0.12, 0.36),
-            ('Up5', 0.12, 0.24), ('Low5', 0.30, 0.24),
+            ('8U09', 0.47, 0.62),('8L10', 0.63, 0.62), 
+            ('8U07', 0.47, 0.47), ('8L08', 0.63, 0.47), 
+            ('8U05', 0.47, 0.34), ('8L06', 0.63, 0.34),
+            ('8U01', 0.12, 0.46), ('8L02', 0.12, 0.36),
+            ('8U03', 0.12, 0.24), ('8L04', 0.30, 0.24),
         ]:
             color = self.get_bunk_color(bed_name)
             btn = Button(
@@ -385,7 +563,7 @@ class RoomBScreen(Screen):
 
             def submit_tenant(instance):
                 self.add_tenant(
-                    room='A', bunk=bunk_name,
+                    room='1508', bunk=bunk_name,
                     name=name_input.text,
                     number=contact_input.text,
                     date=date_input.text,
@@ -471,9 +649,6 @@ class RoomBScreen(Screen):
             conn.commit()
         except Exception as e:
             print(f"Error deleting tenant: {e}")
-
-
-
 # 📋 Tenant Info Screen
 class TenantInfoScreen(Screen):
     def __init__(self, **kwargs):
@@ -549,9 +724,9 @@ class TenantInfoScreen(Screen):
                 f"Room: {tenant[1]}\n"
                 f"Bunk: {tenant[2]}\n"
                 f"Name: {tenant[3]}\n"
-                f"Date: {tenant[4]}\n"
+                f"Move in: {tenant[4]}\n"
                 f"Contact: {tenant[5]}\n"
-                f"Leave: {tenant[7] or 'N/A'}\n"
+                f"Move out: {tenant[7] or 'N/A'}\n"
                 f"Payment: ₱{tenant[6] if tenant[6] else '0.00'}"
             )
 
@@ -594,8 +769,8 @@ class TenantInfoScreen(Screen):
         # self.layout.add_widget(back_btn)
 
     def search_tenant_popup(self, instance):
-        name_query = self.search_input.text.strip().lower()
-        if not name_query:
+        query = self.search_input.text.strip().lower()
+        if not query:
             return
 
         today = datetime.today().strftime("%Y-%m-%d")
@@ -606,11 +781,12 @@ class TenantInfoScreen(Screen):
         """, (today,))
         tenants = cursor.fetchall()
 
-        matches = [t for t in tenants if name_query == t[2].strip().lower()]
+        # Match against name or bunk
+        matches = [t for t in tenants if query in t[2].strip().lower() or query in t[1].strip().lower()]
 
         if not matches:
             popup = Popup(title="No Match Found",
-                        content=Label(text="No tenant found with that name."),
+                        content=Label(text="No tenant found with that name or bunk."),
                         size_hint=(0.8, 0.3))
             popup.open()
             return
@@ -625,9 +801,9 @@ class TenantInfoScreen(Screen):
                 f"Room: {t[0]}\n"
                 f"Bunk: {t[1]}\n"
                 f"Name: {t[2]}\n"
-                f"Date: {t[3]}\n"
+                f"Move in: {t[3]}\n"
                 f"Contact: {t[4]}\n"
-                f"Payment: ₱{t[5] if t[5] else '0.00'}\n"
+                f"Move out: ₱{t[5] if t[5] else '0.00'}\n"
                 f"Leave: {t[6] or 'N/A'}"
             )
             label = Label(text=info, halign='left', valign='top', size_hint_y=None, height=160)
@@ -642,7 +818,7 @@ class TenantInfoScreen(Screen):
 
         popup = Popup(title="Tenant Info", content=scroll, size_hint=(0.9, 0.8))
         popup.open()
-        
+            
     def update_payment(self, tenant_id, payment):
         if not payment.strip().replace('.', '', 1).isdigit():
             return
@@ -672,10 +848,17 @@ class BedSpaceApp(App):
         # Add all screens to the same ScreenManager instance
         sm.add_widget(MenuScreen(name="menu"))
         sm.add_widget(TenantInfoScreen(name="tenant_info"))
+        sm.add_widget(UnitARoomAScreen(name="unit_a_room_a"))  # New layout with image and buttons
         sm.add_widget(RoomAScreen(name="room_a"))  # New layout with image and buttons
         sm.add_widget(RoomBScreen(name="room_b"))  # New layout with image and buttons
 
-        return sm
 
+        return sm
 BedSpaceApp().run()
+# class TestApp(App):
+#     def build(self):
+#         return UnitARoomAScreen()
+
+# TestApp().run()
+
 
